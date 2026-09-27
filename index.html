@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中学理科 4択タイムアタック</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+        body { font-family: 'Noto Sans JP', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- アイコンコンポーネント (外部ライブラリ依存なし) ---
+        const IconBase = ({ children, className, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
+        );
+        const CheckCircle = (props) => <IconBase {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>;
+        const XCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></IconBase>;
+        const ChevronRight = (props) => <IconBase {...props}><polyline points="9 18 15 12 9 6"/></IconBase>;
+        const RotateCcw = (props) => <IconBase {...props}><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></IconBase>;
+        const BookOpen = (props) => <IconBase {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></IconBase>;
+        const FlaskConical = (props) => <IconBase {...props}><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></IconBase>;
+        const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconBase>;
+        const Trophy = (props) => <IconBase {...props}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M9 22v-2.5a2.5 2.5 0 0 1 0-5.32V11a3 3 0 0 1 6 0v3.18a2.5 2.5 0 0 1 0 5.32V22"/></IconBase>;
+        const Medal = (props) => <IconBase {...props}><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"/><path d="M11 12 5.12 2.2"/><path d="m13 12 5.88-9.8"/><path d="M8 7h8"/><circle cx="12" cy="17" r="5"/><path d="M12 18v-2h-.5"/></IconBase>;
+        const User = (props) => <IconBase {...props}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>;
+        const PlayCircle = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></IconBase>;
+        const Skull = (props) => <IconBase {...props}><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></IconBase>;
+        const Heart = (props) => <IconBase {...props}><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></IconBase>;
+        const ShieldCheck = (props) => <IconBase {...props}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></IconBase>;
+
+        // ==========================================
+        // 問題データプール（全200問）
+        // ==========================================
+        const FULL_QUESTION_POOL = [
+            // --- 生物 ---
+            { id: 101, category: '生物', grade: '中1', question: '植物の光合成で、材料として使われる気体は何か？', options: ['酸素', '二酸化炭素', '窒素', '水素'], answer: '二酸化炭素', explanation: '光合成は、二酸化炭素と水から、光のエネルギーを使ってデンプンなどの養分と酸素を作る働きです。' },
+            { id: 102, category: '生物', grade: '中1', question: '根の先端近くにある、細かい毛のようなつくりを何というか？', options: ['根毛', '道管', '師管', '維管束'], answer: '根毛', explanation: '根毛があることで表面積が大きくなり、水や肥料分を効率よく吸収できます。' },
+            { id: 103, category: '生物', grade: '中1', question: '光合成が行われる細胞内の粒を何というか？', options: ['核', '液胞', '葉緑体', '細胞膜'], answer: '葉緑体', explanation: '葉緑体の中にあるクロロフィルという色素が光を受け止めます。' },
+            { id: 104, category: '生物', grade: '中1', question: '植物が体内の水を水蒸気として放出する働きを何というか？', options: ['呼吸', '光合成', '蒸留', '蒸散'], answer: '蒸散', explanation: '主に葉の裏にある気孔から水蒸気が出ます。これにより根からの吸水が盛んになります。' },
+            { id: 105, category: '生物', grade: '中1', question: '被子植物において、受粉が行われる場所はどこか？', options: ['柱頭', 'やく', '子房', '胚珠'], answer: '柱頭', explanation: 'めしべの先端にある柱頭に花粉がつくことを受粉といいます。' },
+            { id: 106, category: '生物', grade: '中1', question: 'マツやイチョウのように、胚珠がむき出しになっている植物を何というか？', options: ['被子植物', '裸子植物', 'シダ植物', 'コケ植物'], answer: '裸子植物', explanation: '被子植物は胚珠が子房の中にありますが、裸子植物は子房がなく胚珠がむき出しです。' },
+            { id: 107, category: '生物', grade: '中1', question: '根・茎・葉の区別がなく、胞子でふえる植物はどれか？', options: ['イヌワラビ', 'ゼニゴケ', 'スギナ', 'サクラ'], answer: 'ゼニゴケ', explanation: 'コケ植物（ゼニゴケなど）は根・茎・葉の区別がありません。シダ植物（イヌワラビなど）は区別があります。' },
+            { id: 108, category: '生物', grade: '中1', question: 'アブラナやサクラのように、花弁がくっついていない花を何というか？', options: ['合弁花', '離弁花', '単性花', '両性花'], answer: '離弁花', explanation: '花弁が1枚ずつ離れているのが離弁花、くっついているのが合弁花（ツツジ、タンポポなど）です。' },
+            { id: 109, category: '生物', grade: '中1', question: '水や水にとけた養分が通る管を何というか？', options: ['道管', '師管', '気孔', '葉脈'], answer: '道管', explanation: '道管は水が通る管、師管は葉で作られた養分が通る管です。' },
+            { id: 110, category: '生物', grade: '中1', question: '道管と師管が集まった束を何というか？', options: ['維管束', '葉脈', '根毛', '形成層'], answer: '維管束', explanation: '維管束の並び方は、単子葉類と双子葉類で異なります。' },
+            { id: 111, category: '生物', grade: '中1', question: '双子葉類の茎の維管束の並び方は？', options: ['輪状に並ぶ', '散らばっている', '中心に集まる', '存在しない'], answer: '輪状に並ぶ', explanation: '双子葉類は輪状、単子葉類（トウモロコシなど）は散らばっています。' },
+            { id: 112, category: '生物', grade: '中1', question: '種子が発芽するために必要ない条件はどれか？', options: ['水', '空気', '適当な温度', '光'], answer: '光', explanation: '発芽の3条件は「水・空気・適当な温度」です。光や肥料は発芽後の成長に必要です。' },
+            { id: 113, category: '生物', grade: '中1', question: 'デンプンがあるかどうかを調べる試薬は何か？', options: ['ヨウ素液', 'ベネジクト液', 'BTB液', 'フェノールフタレイン液'], answer: 'ヨウ素液', explanation: 'ヨウ素液はデンプンに反応して青紫色になります。' },
+            { id: 114, category: '生物', grade: '中2', question: '背骨を持つ動物をまとめて何というか？', options: ['脊椎動物', '無脊椎動物', '節足動物', '軟体動物'], answer: '脊椎動物', explanation: '魚類、両生類、ハ虫類、鳥類、哺乳類が含まれます。' },
+            { id: 115, category: '生物', grade: '中2', question: '母親の胎内で育ってから生まれる生まれ方を何というか？', options: ['卵生', '胎生', '分裂', '出芽'], answer: '胎生', explanation: '哺乳類の特徴です。他の脊椎動物の多くは卵生です。' },
+            { id: 116, category: '生物', grade: '中2', question: '外界の温度が変わると体温も変化する動物を何というか？', options: ['恒温動物', '変温動物', '軟体動物', '脊椎動物'], answer: '変温動物', explanation: '魚類、両生類、ハ虫類などが変温動物です。鳥類と哺乳類は恒温動物です。' },
+            { id: 117, category: '生物', grade: '中2', question: 'バッタやカニのように、体が外骨格でおおわれている動物を何というか？', options: ['節足動物', '軟体動物', '脊椎動物', '原索動物'], answer: '節足動物', explanation: '昆虫類、甲殻類、クモ類、ムカデ類などが含まれます。' },
+            { id: 118, category: '生物', grade: '中2', question: 'イカやタコ、アサリなどの動物の分類は？', options: ['節足動物', '軟体動物', '両生類', '爬虫類'], answer: '軟体動物', explanation: '内臓が外とう膜という筋肉の膜に包まれています。' },
+            { id: 119, category: '生物', grade: '中2', question: '細胞呼吸によって取り出されるものは何か？', options: ['エネルギー', '酸素', 'デンプン', 'タンパク質'], answer: 'エネルギー', explanation: '細胞呼吸では、養分と酸素を使ってエネルギーを取り出し、二酸化炭素と水を排出します。' },
+            { id: 120, category: '生物', grade: '中2', question: '唾液に含まれる消化酵素アミラーゼは何を分解するか？', options: ['デンプン', 'タンパク質', '脂肪', 'ビタミン'], answer: 'デンプン', explanation: 'デンプンを麦芽糖などに分解します。' },
+            { id: 121, category: '生物', grade: '中2', question: '胃液に含まれる消化酵素は何か？', options: ['ペプシン', 'トリプシン', 'リパーゼ', 'アミラーゼ'], answer: 'ペプシン', explanation: 'ペプシンはタンパク質を分解します。' },
+            { id: 122, category: '生物', grade: '中2', question: '胆汁をつくる器官はどこか？', options: ['胆のう', '肝臓', 'すい臓', '小腸'], answer: '肝臓', explanation: '肝臓で作られ、胆のうに貯められます。胆汁は消化酵素を含まず、脂肪の消化を助けます。' },
+            { id: 123, category: '生物', grade: '中2', question: '小腸の壁にある、養分を吸収するための突起を何というか？', options: ['柔毛', '根毛', '肺胞', '繊毛'], answer: '柔毛', explanation: '表面積を大きくし、効率よく養分を吸収します。' },
+            { id: 124, category: '生物', grade: '中2', question: '肺において酸素と二酸化炭素の交換を行う小さな袋を何というか？', options: ['肺胞', '気管支', '柔毛', '細胞'], answer: '肺胞', explanation: '肺胞が無数にあることで表面積が大きくなり、ガス交換の効率が良くなります。' },
+            { id: 125, category: '生物', grade: '中2', question: '心臓から送り出される血液が流れる血管を何というか？', options: ['動脈', '静脈', '毛細血管', 'リンパ管'], answer: '動脈', explanation: '動脈の壁は厚く弾力があります。心臓へ戻る血管は静脈です。' },
+            { id: 126, category: '生物', grade: '中2', question: '酸素を多く含む血液を何というか？', options: ['動脈血', '静脈血', '血漿', '組織液'], answer: '動脈血', explanation: '鮮やかな赤色をしています。二酸化炭素を多く含むのは静脈血（暗赤色）です。' },
+            { id: 127, category: '生物', grade: '中2', question: '血液の成分で、酸素を運ぶ役割をするのは？', options: ['赤血球', '白血球', '血小板', '血しょう'], answer: '赤血球', explanation: 'ヘモグロビンを含み、酸素と結びつきます。' },
+            { id: 128, category: '生物', grade: '中2', question: '不要な物質をこしとり、尿をつくる器官はどれか？', options: ['腎臓', '肝臓', 'ぼうこう', '大腸'], answer: '腎臓', explanation: '腎臓で血液中の老廃物がろ過されます。' },
+            { id: 129, category: '生物', grade: '中2', question: '外界からの刺激を受け取る器官（目や耳など）を何というか？', options: ['感覚器官', '運動器官', '消化器官', '呼吸器官'], answer: '感覚器官', explanation: '刺激を信号に変えて神経に伝えます。' },
+            { id: 130, category: '生物', grade: '中2', question: '中枢神経に含まれるのは脳と何か？', options: ['脊髄', '末梢神経', '感覚神経', '運動神経'], answer: '脊髄', explanation: '脳と脊髄を合わせて中枢神経といいます。' },
+            { id: 131, category: '生物', grade: '中2', question: '意識せずに起こる、生まれつき持っている反応を何というか？', options: ['反射', '習慣', '学習', '随意運動'], answer: '反射', explanation: '熱いものに触れた時に手を引っ込めるなどの反応です。大脳を経由しません。' },
+            { id: 132, category: '生物', grade: '中3', question: '生物の体が大きくなるのは、細胞の何が増えるからか？', options: ['数', '種類', '水分', '核'], answer: '数', explanation: '細胞分裂によって細胞の数が増え、それぞれの細胞が大きくなることで成長します。' },
+            { id: 133, category: '生物', grade: '中3', question: '細胞分裂の際に核の中に現れる、染色されやすいひも状のものは？', options: ['染色体', 'リボソーム', 'ミトコンドリア', 'ゴルジ体'], answer: '染色体', explanation: '遺伝子（DNA）を含んでいます。' },
+            { id: 134, category: '生物', grade: '中3', question: '生殖細胞を作るときに行われる特別な細胞分裂を何というか？', options: ['体細胞分裂', '減数分裂', '無性生殖', '栄養生殖'], answer: '減数分裂', explanation: '染色体の数が半分になる分裂です。受精によって元の数に戻ります。' },
+            { id: 135, category: '生物', grade: '中3', question: '受精を行わずに新しい個体を作るふえ方を何というか？', options: ['無性生殖', '有性生殖', '減数分裂', '自家受粉'], answer: '無性生殖', explanation: '分裂（アメーバ）、出芽（ヒドラ）、栄養生殖（ジャガイモ）などがあります。' },
+            { id: 136, category: '生物', grade: '中3', question: '被子植物において、花粉管の中を通って胚珠へ運ばれるのは何か？', options: ['精細胞', '卵細胞', '胞子', '種子'], answer: '精細胞', explanation: '花粉管が胚珠に達すると、精細胞が送られ、卵細胞と受精します。' },
+            { id: 137, category: '生物', grade: '中3', question: '対立形質を持つ純系同士をかけ合わせた時、子に現れる形質を何というか？', options: ['顕性形質', '潜性形質', '中間形質', '変異'], answer: '顕性形質', explanation: 'メンデルの法則の一つ。現れない形質を潜性形質といいます。' },
+            { id: 138, category: '生物', grade: '中3', question: '減数分裂の際、対になっている遺伝子が別々の生殖細胞に入る法則は？', options: ['分離の法則', '独立の法則', '優性の法則', '質量の法則'], answer: '分離の法則', explanation: 'これにより、孫の代で潜性形質が現れることがあります。' },
+            { id: 139, category: '生物', grade: '中3', question: '遺伝子の本体である物質をアルファベット3文字で何というか？', options: ['DNA', 'RNA', 'ATP', 'ADP'], answer: 'DNA', explanation: 'デオキシリボ核酸のことです。' },
+            { id: 140, category: '生物', grade: '中3', question: '生物が長い時間をかけて代を重ねる間に変化することを何というか？', options: ['進化', '成長', '変態', '適応'], answer: '進化', explanation: '環境に適応して形質が変化していくことです。' },
+            { id: 141, category: '生物', grade: '中3', question: 'コウモリの翼とヒトの腕のように、元は同じ器官だったものが変化したものを何というか？', options: ['相同器官', '相似器官', '痕跡器官', '感覚器官'], answer: '相同器官', explanation: '進化の証拠となる器官です。形や働きは違っても基本的な作りは同じです。' },
+            { id: 142, category: '生物', grade: '中3', question: '始祖鳥は、ハ虫類と何類の中間の特徴を持っているか？', options: ['鳥類', '哺乳類', '両生類', '魚類'], answer: '鳥類', explanation: '口に歯がある（ハ虫類の特徴）、羽毛がある（鳥類の特徴）などを併せ持ちます。' },
+            { id: 143, category: '生物', grade: '中3', question: '生態系において、無機物から有機物を作る植物を何というか？', options: ['生産者', '消費者', '分解者', '捕食者'], answer: '生産者', explanation: '光合成を行う植物は生産者です。' },
+            { id: 144, category: '生物', grade: '中3', question: '生態系において、有機物を無機物に分解する菌類・細菌類を何というか？', options: ['分解者', '生産者', '消費者', '寄生者'], answer: '分解者', explanation: '生物の死骸や排出物を分解し、自然界の物質循環に貢献します。' },
+            { id: 145, category: '生物', grade: '中3', question: '食べる・食べられるという関係のつながりを何というか？', options: ['食物連鎖', '生態系', '食物網', '生物群集'], answer: '食物連鎖', explanation: '複雑に網目状につながったものは食物網といいます。' },
+            { id: 146, category: '生物', grade: '中3', question: '土の中の小動物を採取するのに適した装置は？', options: ['ツルグレン装置', 'ペトリ皿', 'ルーペ', '顕微鏡'], answer: 'ツルグレン装置', explanation: '光や熱を嫌う性質を利用して、土の中の生物を下へ落として集めます。' },
+            { id: 147, category: '生物', grade: '中3', question: '自然界で炭素はどのような形で循環しているか？', options: ['二酸化炭素', '酸素', '窒素', 'メタン'], answer: '二酸化炭素', explanation: '大気中の二酸化炭素が光合成で有機物になり、呼吸や燃焼で再び二酸化炭素に戻ります。' },
+            { id: 148, category: '生物', grade: '中1', question: '顕微鏡で観察する際、最初にする操作は？', options: ['低倍率にする', '高倍率にする', '反射鏡を調節', 'プレパラートを置く'], answer: '反射鏡を調節', explanation: 'まず視野を明るくしてから観察を始めます。また、最初は低倍率から観察します。' },
+            { id: 149, category: '生物', grade: '中1', question: 'プレパラートを作る際、気泡が入らないようにかぶせるガラスは？', options: ['カバーガラス', 'スライドガラス', 'レンズ', 'シャーレ'], answer: 'カバーガラス', explanation: '端から静かにかぶせます。' },
+            { id: 150, category: '生物', grade: '中2', question: '血液中の液体成分で、養分や不要物を運ぶのは？', options: ['血しょう', '赤血球', '白血球', '血小板'], answer: '血しょう', explanation: '組織液となって細胞の間を満たす役割もあります。' },
+
+            // --- 化学 ---
+            { id: 201, category: '化学', grade: '中1', question: '砂糖やデンプンのように、炭素を含み、燃やすと二酸化炭素を出す物質は？', options: ['有機物', '無機物', '金属', '混合物'], answer: '有機物', explanation: 'プラスチックやロウも有機物です。食塩やガラス、金属は無機物です。' },
+            { id: 202, category: '化学', grade: '中1', question: '物質が一定の体積あたりに持っている質量を何というか？', options: ['密度', '濃度', '重力', '浮力'], answer: '密度', explanation: '密度(g/cm³) ＝ 質量(g) ÷ 体積(cm³) で求められます。' },
+            { id: 203, category: '化学', grade: '中1', question: '二酸化炭素の性質として正しいものは？', options: ['石灰水を白く濁らせる', '水に溶けにくい', 'ものを燃やす働きがある', '空気より軽い'], answer: '石灰水を白く濁らせる', explanation: '二酸化炭素は水に少し溶け、空気より重く、火を消す性質があります。' },
+            { id: 204, category: '化学', grade: '中1', question: 'アンモニアを集めるのに適した方法は？', options: ['上方置換法', '下方置換法', '水上置換法', '蒸留'], answer: '上方置換法', explanation: 'アンモニアは水に非常に溶けやすく、空気より軽いため、上方置換法で集めます。' },
+            { id: 205, category: '化学', grade: '中1', question: '水に溶けた物質を取り出すために、溶液を冷やして結晶として取り出す方法を何というか？', options: ['再結晶', '蒸留', 'ろ過', '沈殿'], answer: '再結晶', explanation: '温度による溶解度の差を利用します。ミョウバンなどが代表的です。' },
+            { id: 206, category: '化学', grade: '中1', question: '100gの水に溶ける物質の限界の質量を何というか？', options: ['溶解度', '濃度', '飽和量', '密度'], answer: '溶解度', explanation: '物質の種類や温度によって決まっています。' },
+            { id: 207, category: '化学', grade: '中1', question: '液体が沸騰して気体になるときの温度を何というか？', options: ['沸点', '融点', '露点', '氷点'], answer: '沸点', explanation: '水は100℃、エタノールは約78℃です。' },
+            { id: 208, category: '化学', grade: '中1', question: '固体が融けて液体になるときの温度を何というか？', options: ['融点', '沸点', '凝固点', '露点'], answer: '融点', explanation: '氷の融点は0℃です。純粋な物質では融点と凝固点は同じ温度です。' },
+            { id: 209, category: '化学', grade: '中1', question: '液体の混合物を沸点の違いを利用して分ける方法を何というか？', options: ['蒸留', '再結晶', 'ろ過', '電気分解'], answer: '蒸留', explanation: '水とエタノールの混合物を分ける実験などが有名です。' },
+            { id: 210, category: '化学', grade: '中1', question: '物質が状態変化するとき、変化しないものは何か？', options: ['質量', '体積', '密度', '温度'], answer: '質量', explanation: '粒子の集まり方が変わるだけで、粒子の数は変わらないため質量は変化しません。体積は変化します。' },
+            { id: 211, category: '化学', grade: '中1', question: '水素の性質として正しいものは？', options: ['最も軽い気体', '空気より重い', '石灰水を濁らせる', '特有の刺激臭がある'], answer: '最も軽い気体', explanation: '火を近づけると音を立てて燃え、水ができます。' },
+            { id: 212, category: '化学', grade: '中1', question: '金属の性質「叩くと広がる」ことを何というか？', options: ['展性', '延性', '磁性', '伝導性'], answer: '展性', explanation: '引っ張ると伸びる性質は「延性」です。' },
+            { id: 213, category: '化学', grade: '中2', question: '物質を作っている最小の粒子を何というか？', options: ['原子', '分子', '元素', 'イオン'], answer: '原子', explanation: 'ドルトンが提唱しました。化学変化でそれ以上分けられません。' },
+            { id: 214, category: '化学', grade: '中2', question: 'いくつかの原子が結びついてできた、物質の性質を示す最小の単位を何というか？', options: ['分子', '原子', '元素', '化合物'], answer: '分子', explanation: 'アボガドロが提唱しました。水(H₂O)や酸素(O₂)などは分子を作ります。' },
+            { id: 215, category: '化学', grade: '中2', question: '1種類の原子だけでできている物質を何というか？', options: ['単体', '化合物', '混合物', '純物質'], answer: '単体', explanation: '酸素(O₂)、鉄(Fe)などが単体です。水(H₂O)は化合物です。' },
+            { id: 216, category: '化学', grade: '中2', question: '2種類以上の原子が結びついてできている物質を何というか？', options: ['化合物', '単体', '混合物', '元素'], answer: '化合物', explanation: '二酸化炭素(CO₂)や塩化ナトリウム(NaCl)などが化合物です。' },
+            { id: 217, category: '化学', grade: '中2', question: '化学変化の前後で、物質全体の質量が変わらない法則を何というか？', options: ['質量保存の法則', '定比例の法則', '慣性の法則', 'オームの法則'], answer: '質量保存の法則', explanation: '原子の組み合わせが変わるだけで、原子の種類と数は変わらないためです。' },
+            { id: 218, category: '化学', grade: '中2', question: '銅と酸素が化合するときの質量の割合は？', options: ['4:1', '3:2', '1:1', '2:1'], answer: '4:1', explanation: '銅4gと酸素1gが反応して、酸化銅5gができます。' },
+            { id: 219, category: '化学', grade: '中2', question: 'マグネシウムと酸素が化合するときの質量の割合は？', options: ['3:2', '4:1', '1:1', '2:3'], answer: '3:2', explanation: 'マグネシウム3gと酸素2gが反応して、酸化マグネシウム5gができます。' },
+            { id: 220, category: '化学', grade: '中2', question: '物質が熱や光を出して激しく酸化することを何というか？', options: ['燃焼', '還元', '分解', '中和'], answer: '燃焼', explanation: '有機物が燃焼すると、二酸化炭素と水ができます。' },
+            { id: 221, category: '化学', grade: '中2', question: '酸化物から酸素を取り除く化学変化を何というか？', options: ['還元', '酸化', '分解', '化合'], answer: '還元', explanation: '酸化銅を炭素と加熱すると、銅に還元され、炭素は酸化されて二酸化炭素になります。' },
+            { id: 222, category: '化学', grade: '中2', question: '化学変化の際に熱が発生し、温度が上がる反応を何というか？', options: ['発熱反応', '吸熱反応', '中和反応', '酸化反応'], answer: '発熱反応', explanation: 'カイロなどは鉄の酸化による発熱反応を利用しています。' },
+            { id: 223, category: '化学', grade: '中2', question: '化学変化の際に周囲の熱を奪い、温度が下がる反応を何というか？', options: ['吸熱反応', '発熱反応', '燃焼', '還元'], answer: '吸熱反応', explanation: '炭酸水素ナトリウムとクエン酸の反応や、塩化アンモニウムと水酸化バリウムの反応などがあります。' },
+            { id: 224, category: '化学', grade: '中2', question: '炭酸水素ナトリウムを加熱分解するとできる液体は？', options: ['水', '石灰水', '酢酸', 'エタノール'], answer: '水', explanation: '試験管の口元についた液体を塩化コバルト紙につけると桃色になります。' },
+            { id: 225, category: '化学', grade: '中2', question: '硫黄と鉄の混合物を加熱するとできる物質は？', options: ['硫化鉄', '酸化鉄', '塩化鉄', '硫酸鉄'], answer: '硫化鉄', explanation: '黒色の物質で、塩酸を加えると腐卵臭のする硫化水素が発生します。' },
+            { id: 226, category: '化学', grade: '中2', question: '水の電気分解で、陰極（マイナス極）に発生する気体は？', options: ['水素', '酸素', '塩素', '窒素'], answer: '水素', explanation: '陽極には酸素が発生します。体積比は 水素:酸素 = 2:1 です。' },
+            { id: 227, category: '化学', grade: '中2', question: '元素記号「Na」は何を表すか？', options: ['ナトリウム', '窒素', 'ニッケル', 'ネオン'], answer: 'ナトリウム', explanation: '窒素はNです。' },
+            { id: 228, category: '化学', grade: '中2', question: '化学式「NH₃」で表される物質は？', options: ['アンモニア', '窒素', '水素', 'メタン'], answer: 'アンモニア', explanation: '窒素原子1個と水素原子3個が結びついています。' },
+            { id: 229, category: '化学', grade: '中3', question: '水に溶かすと電気を通す物質を何というか？', options: ['電解質', '非電解質', '導体', '絶縁体'], answer: '電解質', explanation: '食塩や塩化水素などは電解質、砂糖やエタノールは非電解質です。' },
+            { id: 230, category: '化学', grade: '中3', question: '原子の中心にあり、+の電気を持つ粒子は？', options: ['陽子', '中性子', '電子', '原子核'], answer: '陽子', explanation: '原子核は陽子と中性子からできています。原子全体では電気的に中性です。' },
+            { id: 231, category: '化学', grade: '中3', question: '原子核の周りを回っている、-の電気を持つ粒子は？', options: ['電子', '陽子', '中性子', 'イオン'], answer: '電子', explanation: '電子を失うと陽イオン、受け取ると陰イオンになります。' },
+            { id: 232, category: '化学', grade: '中3', question: '原子が電気を帯びたものを何というか？', options: ['イオン', '分子', '元素', 'プラズマ'], answer: 'イオン', explanation: '電解質は水に溶けるとイオンに分かれます（電離）。' },
+            { id: 233, category: '化学', grade: '中3', question: '塩化銅水溶液を電気分解すると、陰極に付着する物質は？', options: ['銅', '塩素', '水素', '酸素'], answer: '銅', explanation: '銅イオン(Cu²⁺)が電子を受け取って銅(Cu)になります。陽極からは塩素が発生します。' },
+            { id: 234, category: '化学', grade: '中3', question: '酸性の水溶液に共通して含まれるイオンは？', options: ['水素イオン', '水酸化物イオン', 'ナトリウムイオン', '塩化物イオン'], answer: '水素イオン', explanation: '水素イオン(H⁺)が酸性の正体です。' },
+            { id: 235, category: '化学', grade: '中3', question: 'アルカリ性の水溶液に共通して含まれるイオンは？', options: ['水酸化物イオン', '水素イオン', '銅イオン', '炭酸イオン'], answer: '水酸化物イオン', explanation: '水酸化物イオン(OH⁻)がアルカリ性の正体です。' },
+            { id: 236, category: '化学', grade: '中3', question: 'BTB液は酸性で何色になるか？', options: ['黄色', '緑色', '青色', '赤色'], answer: '黄色', explanation: '酸性：黄、中性：緑、アルカリ性：青 です。' },
+            { id: 237, category: '化学', grade: '中3', question: 'フェノールフタレイン液はアルカリ性で何色になるか？', options: ['赤色', '無色', '青色', '黄色'], answer: '赤色', explanation: '酸性・中性では無色です。' },
+            { id: 238, category: '化学', grade: '中3', question: '酸とアルカリを混ぜ合わせたときに水ができる反応を何というか？', options: ['中和', '酸化', '還元', '分解'], answer: '中和', explanation: 'H⁺ + OH⁻ → H₂O という反応が起きます。同時に塩（えん）ができます。' },
+            { id: 239, category: '化学', grade: '中3', question: '塩酸と水酸化ナトリウム水溶液の中和でできる塩は？', options: ['塩化ナトリウム', '塩化アンモニウム', '硫酸バリウム', '硝酸カリウム'], answer: '塩化ナトリウム', explanation: 'いわゆる食塩です。' },
+            { id: 240, category: '化学', grade: '中3', question: '硫酸と水酸化バリウム水溶液の中和で生じる白い沈殿は？', options: ['硫酸バリウム', '塩化バリウム', '硫酸ナトリウム', '水酸化銅'], answer: '硫酸バリウム', explanation: '水に溶けにくいため沈殿します。' },
+            { id: 241, category: '化学', grade: '中3', question: 'pH（ピーエイチ）が7より小さいときは何性か？', options: ['酸性', '中性', 'アルカリ性', '揮発性'], answer: '酸性', explanation: 'pH7が中性、7より大きいとアルカリ性、小さいと酸性です。' },
+            { id: 242, category: '化学', grade: '中3', question: 'ダニエル電池で、セロハンや素焼き板を使う理由は？', options: ['液が混ざるのを防ぎイオンを通す', '電流を遮断する', '電子を通す', '沈殿を防ぐ'], answer: '液が混ざるのを防ぎイオンを通す', explanation: '2種類の水溶液が急に混ざるのを防ぎつつ、電気の回路を作るためにイオンを通す必要があります。' },
+            { id: 243, category: '化学', grade: '中3', question: '燃料電池は何と何を反応させて電気を取り出すか？', options: ['水素と酸素', '水素と窒素', '酸素と炭素', 'メタンと酸素'], answer: '水素と酸素', explanation: '排出されるのが水だけで、環境に優しい電池です。' },
+            { id: 244, category: '化学', grade: '中2', question: '化学変化を表すために化学式を使って書いた式を何というか？', options: ['化学反応式', 'イオン式', '組成式', '方程式'], answer: '化学反応式', explanation: '例：2H₂ + O₂ → 2H₂O' },
+            { id: 245, category: '化学', grade: '中1', question: 'エタノールの沸点は水より高いか低いか？', options: ['低い', '高い', '同じ', '圧力による'], answer: '低い', explanation: 'エタノールは約78℃、水は100℃です。' },
+            { id: 246, category: '化学', grade: '中1', question: 'ガスバーナーで空気の量を調節するねじは？', options: ['上部（空気調節ねじ）', '下部（ガス調節ねじ）', '元栓', 'コック'], answer: '上部（空気調節ねじ）', explanation: '下はガス調節ねじです。火をつけるときは下から、消すときは上から操作するのが基本の手順と逆にならないよう注意（つけるときはガス→空気）。' },
+            { id: 247, category: '化学', grade: '中1', question: 'メスシリンダーで液面を読むとき、どこを読むか？', options: ['液面の最も低い位置', '液面の最も高い位置', '中間', '目盛りの上'], answer: '液面の最も低い位置', explanation: '目線を液面の高さに合わせて読みます。' },
+            { id: 248, category: '化学', grade: '中2', question: 'スチールウール（鉄）を燃やすと質量はどうなるか？', options: ['増える', '減る', '変わらない', 'なくなる'], answer: '増える', explanation: '結びついた酸素の分だけ質量が増えます。' },
+            { id: 249, category: '化学', grade: '中3', question: '亜鉛と塩酸が反応すると発生する気体は？', options: ['水素', '酸素', '二酸化炭素', '塩素'], answer: '水素', explanation: '金属（金や銅などを除く）は酸に溶けて水素を発生します。' },
+            { id: 250, category: '化学', grade: '中2', question: '化学変化において、反応に関係しない物質の質量を除くと、反応する物質の質量比はどうなるか？', options: ['常に一定である', '温度による', '体積による', '変化する'], answer: '常に一定である', explanation: '定比例の法則の説明です。' },
+
+            // --- 物理 ---
+            { id: 301, category: '物理', grade: '中1', question: '光が鏡で反射するとき、入射角と反射角の関係は？', options: ['等しい', '入射角が大きい', '反射角が大きい', '関係ない'], answer: '等しい', explanation: 'これを「反射の法則」といいます。' },
+            { id: 302, category: '物理', grade: '中1', question: '光が空気中から水中に進むとき、屈折角は入射角よりどうなるか？', options: ['小さくなる', '大きくなる', '変わらない', '全反射する'], answer: '小さくなる', explanation: '密度が高い物質に進むときは、屈折角の方が小さくなります。' },
+            { id: 303, category: '物理', grade: '中1', question: '水中から空気中に光が進むとき、入射角がある角度以上になると光がすべて反射する現象は？', options: ['全反射', '乱反射', '分散', '回折'], answer: '全反射', explanation: '光ファイバーなどに利用されています。' },
+            { id: 304, category: '物理', grade: '中1', question: '凸レンズを通して物体を見たとき、物体が焦点の外側にあると、スクリーンの反対側にできる像は？', options: ['実像', '虚像', '正立像', '鏡像'], answer: '実像', explanation: '実像は上下左右が逆になります（倒立実像）。' },
+            { id: 305, category: '物理', grade: '中1', question: '音が1秒間に振動する回数を何というか？', options: ['振動数（周波数）', '振幅', '波長', '速度'], answer: '振動数（周波数）', explanation: '単位はヘルツ(Hz)です。振動数が多いほど高い音になります。' },
+            { id: 306, category: '物理', grade: '中1', question: '音が大きいとき、波形の何が大きいか？', options: ['振幅', '振動数', '波長', '周期'], answer: '振幅', explanation: '振幅（揺れ幅）が大きいほど音は大きく、振動数が多いほど音は高くなります。' },
+            { id: 307, category: '物理', grade: '中1', question: '空気中で音が伝わる速さは約何m/sか？', options: ['約340m/s', '約30万km/s', '約1000m/s', '約15m/s'], answer: '約340m/s', explanation: '気温15℃のとき約340m/sです。光の速さは約30万km/sです。' },
+            { id: 308, category: '物理', grade: '中1', question: '物体にはたらく重力の大きさを何というか？', options: ['重さ', '質量', '体積', '密度'], answer: '重さ', explanation: '質量は場所が変わっても変化しませんが、重さ（重量）は重力によって変わります。' },
+            { id: 309, category: '物理', grade: '中1', question: 'ばねののびは、ばねを引く力の大きさに比例するという法則は？', options: ['フックの法則', 'オームの法則', '慣性の法則', '作用反作用の法則'], answer: 'フックの法則', explanation: '力の大きさとばねの伸びは比例関係にあります。' },
+            { id: 310, category: '物理', grade: '中1', question: '面を垂直に押す力を、その力がはたらく面積で割ったものを何というか？', options: ['圧力', '浮力', '重力', '摩擦力'], answer: '圧力', explanation: '単位はパスカル(Pa)またはN/m²です。面積が小さいほど圧力は大きくなります。' },
+            { id: 311, category: '物理', grade: '中1', question: '水中にある物体にはたらく、上向きの力を何というか？', options: ['浮力', '水圧', '重力', '抗力'], answer: '浮力', explanation: 'アルキメデスの原理に関係します。水中にある部分の体積分の水の重さに等しい力が働きます。' },
+            { id: 312, category: '物理', grade: '中1', question: '水深が深くなるほど、水圧はどうなるか？', options: ['大きくなる', '小さくなる', '変わらない', 'なくなる'], answer: '大きくなる', explanation: '水圧は水の重さによって生じるため、深いほど大きくなります。あらゆる向きからはたらきます。' },
+            { id: 313, category: '物理', grade: '中2', question: '回路に流れる電流の大きさを測る計器は？', options: ['電流計', '電圧計', '検流計', '電力計'], answer: '電流計', explanation: '回路に直列につなぎます。電圧計は並列につなぎます。' },
+            { id: 314, category: '物理', grade: '中2', question: '直列回路において、全体の抵抗は各抵抗の和と比べてどうなるか？', options: ['大きくなる', '小さくなる', '変わらない', '半分になる'], answer: '大きくなる', explanation: 'R = R₁ + R₂ なので、つなげばつなぐほど全体の抵抗は大きくなり、電流は流れにくくなります。' },
+            { id: 315, category: '物理', grade: '中2', question: '並列回路において、各抵抗にかかる電圧はどうなるか？', options: ['すべて等しい', '抵抗によって違う', '電流に比例する', '電源の半分'], answer: 'すべて等しい', explanation: '並列回路では、どの枝にも電源と同じ電圧がかかります。' },
+            { id: 316, category: '物理', grade: '中2', question: '抵抗Rに電圧Vを加えたとき、流れる電流Iを求める式は？（オームの法則）', options: ['I = V / R', 'I = V × R', 'I = R / V', 'I = V + R'], answer: 'I = V / R', explanation: '電流は電圧に比例し、抵抗に反比例します。' },
+            { id: 317, category: '物理', grade: '中2', question: '10Ωの抵抗に2Aの電流が流れているとき、電圧は何Vか？', options: ['20V', '5V', '0.2V', '12V'], answer: '20V', explanation: 'V = R × I = 10 × 2 = 20V です。' },
+            { id: 318, category: '物理', grade: '中2', question: '電力の単位はW（ワット）だが、1Wは何J/sか？', options: ['1J/s', '10J/s', '100J/s', '0.1J/s'], answer: '1J/s', explanation: '1秒間に1Jの電気エネルギーを消費するときの電力が1Wです。' },
+            { id: 319, category: '物理', grade: '中2', question: '100V-500Wの電気ポットと100V-1000Wのドライヤー、抵抗が小さいのは？', options: ['ドライヤー', '電気ポット', '同じ', '計算できない'], answer: 'ドライヤー', explanation: '同じ電圧なら、電力が大きい（たくさん電流が流れる）方が抵抗は小さいです。' },
+            { id: 320, category: '物理', grade: '中2', question: '電流が磁界から受ける力を利用して回転する装置は？', options: ['モーター', '発電機', '変圧器', '電熱線'], answer: 'モーター', explanation: 'フレミングの左手の法則の原理を利用しています。' },
+            { id: 321, category: '物理', grade: '中2', question: 'コイルの中の磁界を変化させると電流が流れる現象を何というか？', options: ['電磁誘導', '静電誘導', '誘電分極', '放電'], answer: '電磁誘導', explanation: 'この時流れる電流を誘導電流といいます。発電機の原理です。' },
+            { id: 322, category: '物理', grade: '中2', question: '摩擦によって生じる電気を何というか？', options: ['静電気', '動電気', '圧電', '熱電'], answer: '静電気', explanation: '異なる物質をこすり合わせると、−の電気（電子）が移動して生じます。' },
+            { id: 323, category: '物理', grade: '中2', question: '陰極線（電子線）の正体は何か？', options: ['電子の流れ', '陽子の流れ', '中性子の流れ', '光の流れ'], answer: '電子の流れ', explanation: '−極から飛び出した電子の流れです。クルックス管などで観察されます。' },
+            { id: 324, category: '物理', grade: '中3', question: '物体が一定の速さで一直線上を進む運動を何というか？', options: ['等速直線運動', '自由落下', '加速運動', '円運動'], answer: '等速直線運動', explanation: '力がはたらいていないか、つり合っているときに起こります。移動距離は時間に比例します。' },
+            { id: 325, category: '物理', grade: '中3', question: '斜面を下る台車の運動のように、速さがだんだん速くなる運動では、物体にどのような力が働いているか？', options: ['運動の向きに一定の力', '運動と逆向きの力', '力が働いていない', '変化する力'], answer: '運動の向きに一定の力', explanation: '重力の斜面方向の分力が働き続けるため、加速します。' },
+            { id: 326, category: '物理', grade: '中3', question: '物体に力を加えて動かしたとき、力の大きさと動いた距離の積を何というか？', options: ['仕事', '仕事率', 'エネルギー', '運動量'], answer: '仕事', explanation: '仕事(J) = 力(N) × 向きに動いた距離(m)。動かないときは仕事は0です。' },
+            { id: 327, category: '物理', grade: '中3', question: '定滑車を使うと、物体を持ち上げるのに必要な力はどうなるか？', options: ['変わらない', '半分になる', '2倍になる', 'ゼロになる'], answer: '変わらない', explanation: '定滑車は力の向きを変えるだけで、力の大きさは変わりません。動滑車は力が半分になります。' },
+            { id: 328, category: '物理', grade: '中3', question: '道具を使っても使わなくても、仕事の大きさは変わらない原理を何というか？', options: ['仕事の原理', 'てこの原理', 'アルキメデスの原理', 'エネルギー保存の法則'], answer: '仕事の原理', explanation: '動滑車などを使うと力は小さくて済みますが、動かす距離が長くなるため、積（仕事）は変わりません。' },
+            { id: 329, category: '物理', grade: '中3', question: '運動している物体が持っているエネルギーを何というか？', options: ['運動エネルギー', '位置エネルギー', '熱エネルギー', '化学エネルギー'], answer: '運動エネルギー', explanation: '質量に比例し、速さの2乗に比例します。' },
+            { id: 330, category: '物理', grade: '中3', question: '高いところにある物体が持つエネルギーを何というか？', options: ['位置エネルギー', '運動エネルギー', '弾性エネルギー', '電気エネルギー'], answer: '位置エネルギー', explanation: '高さと質量に比例します。' },
+            { id: 331, category: '物理', grade: '中3', question: '位置エネルギーと運動エネルギーの和を何というか？', options: ['力学的エネルギー', '熱エネルギー', '全エネルギー', '保存エネルギー'], answer: '力学的エネルギー', explanation: '摩擦や空気抵抗がなければ、力学的エネルギーは保存されます。' },
+            { id: 332, category: '物理', grade: '中3', question: '物体Aが物体Bに力を加えると、同時にBからAにも同じ大きさで逆向きの力が働く法則は？', options: ['作用・反作用の法則', '慣性の法則', 'フックの法則', '力のつり合い'], answer: '作用・反作用の法則', explanation: '押すと押し返される力のことです。力のつり合いとは異なり、2つの物体間での力です。' },
+            { id: 333, category: '物理', grade: '中3', question: '2つの力がつり合う条件として間違っているものは？', options: ['2つの物体の間にはたらく', '大きさが等しい', '一直線上にある', '向きが反対である'], answer: '2つの物体の間にはたらく', explanation: 'つり合いは「1つの物体」に働く2力、作用反作用は「2つの物体」間です。' },
+            { id: 334, category: '物理', grade: '中1', question: '質量100gの物体にはたらく重力を1Nとする。質量1.5kgの物体にはたらく重力は？', options: ['15N', '1.5N', '150N', '0.15N'], answer: '15N', explanation: '1.5kg = 1500g なので、15Nです。' },
+            { id: 335, category: '物理', grade: '中2', question: 'コイルに鉄心を入れたものを何というか？', options: ['電磁石', '永久磁石', '抵抗器', 'コンデンサ'], answer: '電磁石', explanation: '電流を流している間だけ磁石になり、電流の向きを変えると極が変わります。' },
+            { id: 336, category: '物理', grade: '中2', question: '家庭のコンセントに来ている電気は直流か交流か？', options: ['交流', '直流', '混合', '静電気'], answer: '交流', explanation: '東日本は50Hz、西日本は60Hzの交流です。電流の向きと大きさが周期的に変化します。' },
+            { id: 337, category: '物理', grade: '中3', question: 'エネルギーが変換されるとき、最終的に行きつく使いにくいエネルギーは何か？', options: ['熱エネルギー', '電気エネルギー', '化学エネルギー', '光エネルギー'], answer: '熱エネルギー', explanation: '摩擦熱などになり、再利用が難しくなります。' },
+            { id: 338, category: '物理', grade: '中1', question: '光の三原色は赤、緑と何か？', options: ['青', '黄', '白', '黒'], answer: '青', explanation: 'RGB (Red, Green, Blue) です。すべて混ぜると白色光になります。' },
+            { id: 339, category: '物理', grade: '中2', question: '直列回路で電流の通り道が途切れるとどうなるか？', options: ['すべての電流が止まる', '他の部分は流れる', '電圧が上がる', 'ショートする'], answer: 'すべての電流が止まる', explanation: '一本道なので、一箇所切れると全て止まります（例：クリスマスツリーの電球の一部）。' },
+            { id: 340, category: '物理', grade: '中1', question: '音が壁に当たって返ってくる現象を利用して距離を測ることができる。これを何というか？', options: ['反響（エコー）', '共鳴', '干渉', '回折'], answer: '反響（エコー）', explanation: 'やまびこもこれです。往復の時間を考慮して距離を計算します。' },
+            { id: 341, category: '物理', grade: '中3', question: '水力発電、火力発電、原子力発電などで、発電機を回すために使われる回転体を何というか？', options: ['タービン', 'プロペラ', 'スクリュー', 'ピストン'], answer: 'タービン', explanation: '水や蒸気の力でタービンを回し、発電機を動かします。' },
+            { id: 342, category: '物理', grade: '中2', question: '電流が流れる物質を導体というが、流れない物質を何というか？', options: ['不導体（絶縁体）', '半導体', '超伝導体', '誘電体'], answer: '不導体（絶縁体）', explanation: 'ゴム、ガラス、プラスチックなどが不導体です。' },
+            { id: 343, category: '物理', grade: '中3', question: '坂道を登るとき、斜面を使うと直接持ち上げるより力は小さくて済むが、仕事の量はどうなるか？', options: ['変わらない', '増える', '減る', 'ゼロになる'], answer: '変わらない', explanation: '仕事の原理により、摩擦がなければ仕事量は変わりません。' },
+            { id: 344, category: '物理', grade: '中3', question: 'ジェットコースターが一番高いところから下るとき、増えるエネルギーは？', options: ['運動エネルギー', '位置エネルギー', '熱エネルギー', '電気エネルギー'], answer: '運動エネルギー', explanation: '位置エネルギーが減り、運動エネルギーに変わります。' },
+            { id: 345, category: '物理', grade: '中2', question: 'フレミングの左手の法則で、親指が表す向きは？', options: ['力', '磁界', '電流', '電圧'], answer: '力', explanation: '中指＝電流、人差し指＝磁界、親指＝力（電・磁・力）です。' },
+            { id: 346, category: '物理', grade: '中1', question: '白い物体は光をどうしているか？', options: ['反射している', '吸収している', '透過している', '屈折している'], answer: '反射している', explanation: 'すべての色の光を反射すると白く見えます。黒い物体は吸収しています。' },
+            { id: 347, category: '物理', grade: '中2', question: '回路図で、丸にバツ（×）の記号は何を表すか？', options: ['電球（豆電球）', 'スイッチ', 'モーター', 'ブザー'], answer: '電球（豆電球）', explanation: '古いJISでは丸にバツでしたが、現在は丸の中に×印は電球やランプを表します。LEDはダイオード記号を使います。' },
+            { id: 348, category: '物理', grade: '中3', question: '自然エネルギー（再生可能エネルギー）に含まれないものは？', options: ['原子力', '太陽光', '風力', '地熱'], answer: '原子力', explanation: '原子力はウランなどの燃料を使うため、再生可能エネルギーには含まれません。' },
+            { id: 349, category: '物理', grade: '中2', question: '100Vの電圧で10Aの電流が流れた時の電力は？', options: ['1000W', '100W', '10W', '90W'], answer: '1000W', explanation: 'P = V × I = 100 × 10 = 1000W' },
+            { id: 350, category: '物理', grade: '中1', question: '水に浮いている物体にはたらく重力と浮力の関係は？', options: ['つり合っている', '重力が大きい', '浮力が大きい', '関係ない'], answer: 'つり合っている', explanation: '浮いて静止しているなら、重力と浮力はつり合っています。' },
+
+            // --- 地学 ---
+            { id: 401, category: '地学', grade: '中1', question: 'マグマが冷え固まってできた岩石を何というか？', options: ['火成岩', '堆積岩', '変成岩', '石灰岩'], answer: '火成岩', explanation: '火山岩と深成岩に分けられます。' },
+            { id: 402, category: '地学', grade: '中1', question: '火成岩のうち、地表近くで急に冷えて固まった岩石は？', options: ['火山岩', '深成岩', '堆積岩', '砂岩'], answer: '火山岩', explanation: '安山岩や玄武岩などがあります。斑状組織が特徴です。' },
+            { id: 403, category: '地学', grade: '中1', question: '火成岩のうち、地下深くでゆっくり冷えて固まった岩石は？', options: ['深成岩', '火山岩', '凝灰岩', 'チャート'], answer: '深成岩', explanation: '花こう岩などがあります。等粒状組織が特徴です。' },
+            { id: 404, category: '地学', grade: '中1', question: '火山岩に見られる、大きな結晶の部分を何というか？', options: ['斑晶', '石基', 'ガラス質', '化石'], answer: '斑晶', explanation: '細かい部分は石基といいます。' },
+            { id: 405, category: '地学', grade: '中1', question: '無色鉱物に含まれる、不規則に割れる白い（または透明な）鉱物は？', options: ['セキエイ', 'チョウ石', 'クロウンモ', 'キシャク石'], answer: 'セキエイ', explanation: 'ガラス状に見えるのがセキエイ、白くて決まった方向に割れるのがチョウ石です。' },
+            { id: 406, category: '地学', grade: '中1', question: '有色鉱物に含まれる、黒くてうすくはがれる鉱物は？', options: ['クロウンモ', 'カクセン石', 'カンラン石', 'ジテッコウ'], answer: 'クロウンモ', explanation: '黒雲母（くろうんも）です。' },
+            { id: 407, category: '地学', grade: '中1', question: '地震の揺れの大きさ（程度）を表す階級を何というか？', options: ['震度', 'マグニチュード', '震源', '初期微動'], answer: '震度', explanation: '日本では震度0から7までの10段階（5, 6は強弱あり）で表します。' },
+            { id: 408, category: '地学', grade: '中1', question: '地震そのものの規模（エネルギー）を表す数値を何というか？', options: ['マグニチュード', '震度', '震央', '振幅'], answer: 'マグニチュード', explanation: 'Mで表します。Mが1増えるとエネルギーは約32倍になります。' },
+            { id: 409, category: '地学', grade: '中1', question: '地震のとき最初に来る小さな揺れを何というか？', options: ['初期微動', '主要動', '余震', '本震'], answer: '初期微動', explanation: 'P波（縦波）によって起こります。' },
+            { id: 410, category: '地学', grade: '中1', question: '初期微動のあとに来る大きな揺れを何というか？', options: ['主要動', '初期微動', '津波', '液状化'], answer: '主要動', explanation: 'S波（横波）によって起こります。' },
+            { id: 411, category: '地学', grade: '中1', question: '地層が左右から押されて波打ったように曲がったものを何というか？', options: ['しゅう曲', '断層', '整合', '不整合'], answer: 'しゅう曲', explanation: '強い力が長い時間かかってできます。' },
+            { id: 412, category: '地学', grade: '中1', question: '地層がずれて食い違ったものを何というか？', options: ['断層', 'しゅう曲', '露頭', '柱状図'], answer: '断層', explanation: '地震の原因となります。' },
+            { id: 413, category: '地学', grade: '中1', question: '堆積岩のうち、生物の死骸などが固まってでき、塩酸をかけると二酸化炭素が出るものは？', options: ['石灰岩', 'チャート', '泥岩', '凝灰岩'], answer: '石灰岩', explanation: 'チャートも生物の死骸からできていますが、塩酸には反応しません（非常に硬い）。' },
+            { id: 414, category: '地学', grade: '中1', question: '堆積岩のうち、火山灰などが固まってできたものは？', options: ['凝灰岩', '砂岩', 'れき岩', '泥岩'], answer: '凝灰岩', explanation: '地層の鍵層（かぎそう）として、離れた地層の対比に使われます。' },
+            { id: 415, category: '地学', grade: '中1', question: '当時の環境を知る手がかりとなる化石を何というか？', options: ['示相化石', '示準化石', 'アンモナイト', '三葉虫'], answer: '示相化石', explanation: 'サンゴ（暖かくて浅い海）やシジミ（淡水と海水が混ざる場所）など。' },
+            { id: 416, category: '地学', grade: '中1', question: '地層ができた時代を知る手がかりとなる化石を何というか？', options: ['示準化石', '示相化石', '標準化石', '基準化石'], answer: '示準化石', explanation: '広い範囲に短期間生息していた生物の化石（恐竜、アンモナイト、三葉虫など）。' },
+            { id: 417, category: '地学', grade: '中2', question: '空全体の広さを10としたとき、雲の量が9以上の天気は？', options: ['曇り', '晴れ', '快晴', '雨'], answer: '曇り', explanation: '0-1が快晴、2-8が晴れ、9-10が曇りです。' },
+            { id: 418, category: '地学', grade: '中2', question: '気圧配置図で、気圧の等しい地点を結んだ曲線を何というか？', options: ['等圧線', '等高線', '等深線', '等温線'], answer: '等圧線', explanation: '間隔が狭いほど風が強くなります。' },
+            { id: 419, category: '地学', grade: '中2', question: '中心気圧が周りより高いところを何というか？', options: ['高気圧', '低気圧', '前線', '台風'], answer: '高気圧', explanation: '下降気流があり、天気は良くなることが多いです。風は時計回りに吹き出します。' },
+            { id: 420, category: '地学', grade: '中2', question: '低気圧の中心付近の空気の流れは？', options: ['反時計回りに吹き込む上昇気流', '時計回りに吹き出す下降気流', '反時計回りに吹き出す下降気流', '時計回りに吹き込む上昇気流'], answer: '反時計回りに吹き込む上昇気流', explanation: '北半球では反時計回りに風が吹き込み、上昇気流となって雲ができやすくなります。' },
+            { id: 421, category: '地学', grade: '中2', question: '冷たい空気が暖かい空気を押し上げながら進む前線を何というか？', options: ['寒冷前線', '温暖前線', '停滞前線', '閉塞前線'], answer: '寒冷前線', explanation: '通過後は気温が下がり、北寄りの風に変わります。積乱雲ができやすいです。' },
+            { id: 422, category: '地学', grade: '中2', question: '梅雨の時期や秋雨の時期にできる、東西に長く伸びる前線は？', options: ['停滞前線', '寒冷前線', '閉塞前線', '温暖前線'], answer: '停滞前線', explanation: '寒気団と暖気団の勢力が拮抗してあまり動かない前線です。' },
+            { id: 423, category: '地学', grade: '中2', question: '海陸風において、昼間に海から陸へ吹く風を何というか？', options: ['海風', '陸風', '季節風', '偏西風'], answer: '海風', explanation: '昼は陸の方が温まりやすく上昇気流が生じるため、海から風が吹き込みます。' },
+            { id: 424, category: '地学', grade: '中2', question: '空気1m³中に含むことができる水蒸気の最大量を何というか？', options: ['飽和水蒸気量', '湿度', '露点', '絶対湿度'], answer: '飽和水蒸気量', explanation: '気温が高いほど飽和水蒸気量は大きくなります。' },
+            { id: 425, category: '地学', grade: '中2', question: '夏の日本の天気に影響を与える、南東にある気団は？', options: ['小笠原気団', 'シベリア気団', 'オホーツク海気団', '揚子江気団'], answer: '小笠原気団', explanation: '高温・多湿な気団です。' },
+            { id: 426, category: '地学', grade: '中3', question: '地球が地軸を軸として1日に1回回転することを何というか？', options: ['自転', '公転', '南中', '日周運動'], answer: '自転', explanation: 'これにより昼と夜が生じ、天体の日周運動が起こります。' },
+            { id: 427, category: '地学', grade: '中3', question: '地球が太陽の周りを1年で1周することを何というか？', options: ['公転', '自転', '年周運動', '季節変動'], answer: '公転', explanation: 'これにより季節の変化や星座の年周運動が起こります。' },
+            { id: 428, category: '地学', grade: '中3', question: '太陽の通り道である「黄道」にある星座の数はいくつか？', options: ['12個', '88個', '1個', '108個'], answer: '12個', explanation: '黄道十二星座といいます（誕生日の星座など）。' },
+            { id: 429, category: '地学', grade: '中3', question: '北極星がほとんど動かないように見える理由は？', options: ['地軸の延長線上にあるから', '太陽に近いから', '地球と一緒に回っているから', '非常に遠いから'], answer: '地軸の延長線上にあるから', explanation: '天の北極近くにあるため、日周運動の中心になります。' },
+            { id: 430, category: '地学', grade: '中3', question: '日本において、太陽の南中高度が最も高くなる季節は？', options: ['夏至', '冬至', '春分', '秋分'], answer: '夏至', explanation: '昼の時間が最も長くなります。' },
+            { id: 431, category: '地学', grade: '中3', question: '月が太陽を隠す現象を何というか？', options: ['日食', '月食', '満月', '新月'], answer: '日食', explanation: '太陽・月・地球の順に一直線に並んだとき（新月）に起こります。' },
+            { id: 432, category: '地学', grade: '中3', question: '地球の影に月が入る現象を何というか？', options: ['月食', '日食', '満月', '新月'], answer: '月食', explanation: '太陽・地球・月の順に一直線に並んだとき（満月）に起こります。' },
+            { id: 433, category: '地学', grade: '中3', question: '金星が真夜中に見えない理由は？', options: ['地球より内側を公転しているから', '太陽の光が弱いから', '地球の影に入るから', '小さいから'], answer: '地球より内側を公転しているから', explanation: '内惑星である金星は、太陽からあまり離れて見えないため、明け方か夕方にしか見えません。' },
+            { id: 434, category: '地学', grade: '中3', question: '明けの明星と呼ばれる金星はどの方角に見えるか？', options: ['東', '西', '南', '北'], answer: '東', explanation: '日の出前の東の空に見えます。夕方西の空に見えるのは「よいの明星」です。' },
+            { id: 435, category: '地学', grade: '中3', question: '太陽系で、小惑星帯より内側にある岩石質の惑星（水・金・地・火）を何というか？', options: ['地球型惑星', '木星型惑星', '矮惑星', '衛星'], answer: '地球型惑星', explanation: '小型で密度が大きいのが特徴です。木・土・天・海は木星型惑星（ガス惑星）です。' },
+            { id: 436, category: '地学', grade: '中3', question: '太陽の表面にある黒いしみのような部分を何というか？', options: ['黒点', 'プロミネンス', 'コロナ', 'フレア'], answer: '黒点', explanation: '周囲より温度が低いため黒く見えます（約4000℃）。' },
+            { id: 437, category: '地学', grade: '中3', question: '太陽の外側に広がる高温のガスの層（真珠色に輝く）を何というか？', options: ['コロナ', '彩層', '光球', '黒点'], answer: 'コロナ', explanation: '皆既日食のときに肉眼で見ることができます。' },
+            { id: 438, category: '地学', grade: '中1', question: '地層の下の方が古く、上の方が新しいという法則を何というか？', options: ['地層累重の法則', '万有引力の法則', '作用反作用の法則', 'ドップラー効果'], answer: '地層累重の法則', explanation: '地層が逆転していなければ、下に堆積したものほど古くなります。' },
+            { id: 439, category: '地学', grade: '中1', question: '火山灰が冷えて固まった岩石は？', options: ['凝灰岩', '花こう岩', '玄武岩', '石灰岩'], answer: '凝灰岩', explanation: '堆積岩の一種です。' },
+            { id: 440, category: '地学', grade: '中2', question: '日本の天気は西から東へ変わることが多いが、これは何という風の影響か？', options: ['偏西風', '貿易風', '季節風', '極偏東風'], answer: '偏西風', explanation: '中緯度帯の上空を西から東へ吹く強い風です。' },
+            { id: 441, category: '地学', grade: '中2', question: '乾湿計で、乾球と湿球の示度が同じとき、湿度は何％か？', options: ['100%', '0%', '50%', '測定不能'], answer: '100%', explanation: '水が蒸発していない（空気が飽和している）ため、湿球の温度が下がらず同じになります。' },
+            { id: 442, category: '地学', grade: '中3', question: '北極星はどの星座に含まれるか？', options: ['こぐま座', 'おおぐま座', 'カシオペヤ座', 'オリオン座'], answer: 'こぐま座', explanation: '北斗七星はおおぐま座の一部です。' },
+            { id: 443, category: '地学', grade: '中1', question: 'マグマの粘りけが弱い火山の形は？', options: ['盾状火山', '成層火山', '溶岩ドーム', 'カルデラ'], answer: '盾状火山', explanation: 'ハワイのマウナロアなどが例です。傾斜が緩やかです。' },
+            { id: 444, category: '地学', grade: '中3', question: '月の満ち欠けの周期は約何日か？', options: ['約29.5日', '約1日', '約365日', '約15日'], answer: '約29.5日', explanation: '新月から次の新月まで約1ヶ月です。' },
+            { id: 445, category: '地学', grade: '中2', question: '冬の季節風が日本海側に大雪を降らせる理由は？', options: ['海で水蒸気をたっぷり含むから', '山脈で乾燥するから', '気温が高いから', '風が弱いから'], answer: '海で水蒸気をたっぷり含むから', explanation: '対馬暖流の上を通るときに水蒸気を含み、山脈にぶつかって雪を降らせます。' },
+            { id: 446, category: '地学', grade: '中1', question: 'P波の速さはS波と比べてどうなっているか？', options: ['速い', '遅い', '同じ', '場合による'], answer: '速い', explanation: 'P波（Primary wave）の方が速く到達します。' },
+            { id: 447, category: '地学', grade: '中3', question: '銀河系のような星の大集団を何というか？', options: ['銀河', '星団', '星雲', '太陽系'], answer: '銀河', explanation: '宇宙には多数の銀河が存在します。私たちのいる銀河を「銀河系（天の川銀河）」と呼びます。' },
+            { id: 448, category: '地学', grade: '中2', question: '雲ができるのは、空気が上昇して膨張し、温度がどうなるからか？', options: ['下がるから', '上がるから', '変わらないから', '飽和するから'], answer: '下がるから', explanation: '断熱膨張により温度が下がり、露点に達すると水滴（雲）ができます。' },
+            { id: 449, category: '地学', grade: '中1', question: '安山岩は火山岩か深成岩か？', options: ['火山岩', '深成岩', '堆積岩', '変成岩'], answer: '火山岩', explanation: '日本に多い岩石です。' },
+            { id: 450, category: '地学', grade: '中3', question: '太陽系の惑星で、輪が最も発達しているのは？', options: ['土星', '木星', '天王星', '海王星'], answer: '土星', explanation: '氷や岩石の粒でできています。木星や天王星にも輪はありますが、土星ほど目立ちません。' },
+        ];
+
+        // --- ランキングデータ型 ---
+        // type RankingEntry = { name: string; score: number; time: number; date: string; };
+        // type Difficulty = 'easy' | 'hard' | 'oni';
+
+        const formatTime = (ms) => {
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            const milliseconds = Math.floor((ms % 1000) / 100);
+            
+            if (minutes > 0) {
+                return `${minutes}分${seconds.toString().padStart(2, '0')}.${milliseconds}秒`;
+            }
+            return `${seconds}.${milliseconds}秒`;
+        };
+
+        function ScienceQuizRankingApp() {
+            // アプリの状態管理
+            const [appState, setAppState] = useState('start');
+            const [playerName, setPlayerName] = useState('');
+            const [difficulty, setDifficulty] = useState('easy');
+            const [questionCount, setQuestionCount] = useState(10);
+            const [questions, setQuestions] = useState([]);
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [score, setScore] = useState(0);
+            const [wrongCount, setWrongCount] = useState(0);
+            const [selectedOption, setSelectedOption] = useState(null);
+            const [isCorrect, setIsCorrect] = useState(null);
+            const [showExplanation, setShowExplanation] = useState(false);
+            
+            // タイマー関連
+            const [startTime, setStartTime] = useState(0);
+            const [elapsedTime, setElapsedTime] = useState(0);
+            const timerIntervalRef = useRef(null);
+
+            // ランキング関連
+            const [rankings, setRankings] = useState([]);
+
+            // ローカルストレージからランキング読み込み
+            useEffect(() => {
+                const loadRankings = () => {
+                    try {
+                        const key = `scienceQuizRanking_${questionCount}`;
+                        const saved = localStorage.getItem(key);
+                        if (saved) {
+                            setRankings(JSON.parse(saved));
+                        } else {
+                            setRankings([]);
+                        }
+                    } catch (e) {
+                        console.error("Failed to load rankings", e);
+                        setRankings([]);
+                    }
+                };
+                loadRankings();
+            }, [questionCount]);
+
+            // ランキング保存
+            const saveRanking = (entry) => {
+                try {
+                    const key = `scienceQuizRanking_${questionCount}`;
+                    const currentRankings = JSON.parse(localStorage.getItem(key) || '[]');
+                    const newRankings = [...currentRankings, entry];
+                    
+                    newRankings.sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score;
+                        return a.time - b.time;
+                    });
+
+                    const top5 = newRankings.slice(0, 5);
+                    localStorage.setItem(key, JSON.stringify(top5));
+                    setRankings(top5);
+                } catch (e) {
+                    console.error("Failed to save rankings", e);
+                }
+            };
+
+            // ゲーム開始処理
+            const startGame = (count) => {
+                if (!playerName.trim()) {
+                    alert("名前を入力してください！");
+                    return;
+                }
+
+                setQuestionCount(count);
+                
+                // 全問題からランダムにシャッフルして指定数選ぶ
+                const shuffledPool = [...FULL_QUESTION_POOL].sort(() => 0.5 - Math.random());
+                const selectedQuestionsData = shuffledPool.slice(0, count);
+
+                // 各問題の選択肢をシャッフルする
+                const questionsWithShuffledOptions = selectedQuestionsData.map(q => ({
+                    ...q,
+                    options: [...q.options].sort(() => 0.5 - Math.random())
+                }));
+                
+                setQuestions(questionsWithShuffledOptions);
+                setCurrentIndex(0);
+                setScore(0);
+                setWrongCount(0);
+                resetQuestionState();
+                
+                setStartTime(Date.now());
+                setElapsedTime(0);
+                setAppState('playing');
+            };
+
+            const resetQuestionState = () => {
+                setSelectedOption(null);
+                setIsCorrect(null);
+                setShowExplanation(false);
+            };
+
+            // タイマー更新
+            useEffect(() => {
+                if (appState === 'playing') {
+                    timerIntervalRef.current = setInterval(() => {
+                        setElapsedTime(Date.now() - startTime);
+                    }, 100);
+                } else {
+                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                }
+
+                return () => {
+                    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                };
+            }, [appState, startTime]);
+
+            const handleAnswerClick = (option) => {
+                if (showExplanation) return;
+
+                setSelectedOption(option);
+                const correct = option === questions[currentIndex].answer;
+                
+                if (correct) {
+                    setScore(score + 1);
+                    setIsCorrect(true);
+                } else {
+                    setWrongCount(wrongCount + 1);
+                    setIsCorrect(false);
+                }
+                setShowExplanation(true);
+            };
+
+            const handleNext = () => {
+                const isGameOver = (difficulty === 'hard' && wrongCount >= 3) || (difficulty === 'oni' && wrongCount >= 1);
+
+                if (isGameOver) {
+                    setAppState('gameover');
+                    return;
+                }
+
+                if (currentIndex < questions.length - 1) {
+                    setCurrentIndex(currentIndex + 1);
+                    resetQuestionState();
+                } else {
+                    const finalTime = Date.now() - startTime;
+                    setElapsedTime(finalTime);
+                    setAppState('result');
+
+                    const entry = {
+                        name: playerName,
+                        score: score,
+                        time: finalTime,
+                        date: new Date().toLocaleDateString()
+                    };
+                    saveRanking(entry);
+                }
+            };
+
+            const handleRestart = () => {
+                setAppState('start');
+            };
+
+            const getDifficultyBadge = (d) => {
+                switch(d) {
+                    case 'easy': return <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">イージー</span>;
+                    case 'hard': return <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">ハード</span>;
+                    case 'oni': return <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs font-bold">鬼ハード</span>;
+                }
+            };
+
+            if (appState === 'start') {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
+                        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-200">
+                            <div className="flex justify-center mb-6">
+                                <div className="bg-indigo-100 p-4 rounded-full">
+                                    <FlaskConical className="w-12 h-12 text-indigo-600" />
+                                </div>
+                            </div>
+                            <h1 className="text-3xl font-bold mb-2">中学理科 4択タイムアタック</h1>
+                            <p className="text-slate-500 mb-8">全200問のプールから出題！最速タイムを目指そう。</p>
+
+                            <div className="mb-8 space-y-4">
+                                <div className="max-w-xs mx-auto">
+                                    <label className="block text-left text-sm font-bold text-slate-600 mb-2">
+                                        プレイヤー名
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                        <input
+                                            type="text"
+                                            value={playerName}
+                                            onChange={(e) => setPlayerName(e.target.value)}
+                                            placeholder="名前を入力"
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-slate-200 focus:border-indigo-500 focus:outline-none transition-colors font-bold text-lg"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="max-w-md mx-auto">
+                                    <label className="block text-left text-sm font-bold text-slate-600 mb-2">
+                                        難易度モード
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            onClick={() => setDifficulty('easy')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                                                difficulty === 'easy' 
+                                                ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-200 ring-offset-2' 
+                                                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <ShieldCheck className="w-6 h-6" />
+                                            <div>イージー<br/><span className="text-xs font-normal opacity-80">制限なし</span></div>
+                                        </button>
+                                        <button
+                                            onClick={() => setDifficulty('hard')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                                                difficulty === 'hard' 
+                                                ? 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-200 ring-offset-2' 
+                                                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <Heart className="w-6 h-6" />
+                                            <div>ハード<br/><span className="text-xs font-normal opacity-80">3ミス終了</span></div>
+                                        </button>
+                                        <button
+                                            onClick={() => setDifficulty('oni')}
+                                            className={`p-3 rounded-xl border-2 font-bold text-sm transition-all flex flex-col items-center gap-1 ${
+                                                difficulty === 'oni' 
+                                                ? 'border-purple-500 bg-purple-50 text-purple-700 ring-2 ring-purple-200 ring-offset-2' 
+                                                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <Skull className="w-6 h-6" />
+                                            <div>鬼ハード<br/><span className="text-xs font-normal opacity-80">即終了</span></div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                <p className="font-bold text-sm text-slate-400 uppercase tracking-wider">挑戦する問題数を選択してスタート</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {[5, 10, 20, 30, 50, 100, 200].map((count) => (
+                                        <button
+                                            key={count}
+                                            onClick={() => startGame(count)}
+                                            className="flex flex-col items-center justify-center py-4 px-2 bg-white border-2 border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 text-slate-700 rounded-xl transition-all duration-200 font-bold text-lg group active:scale-95 shadow-sm hover:shadow-md"
+                                        >
+                                            <PlayCircle className="w-6 h-6 mb-1 text-slate-400 group-hover:text-indigo-500" />
+                                            {count}問
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (appState === 'gameover') {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
+                        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 p-8 text-center animate-in fade-in zoom-in duration-300">
+                            <div className="mb-6">
+                                <Skull className="w-20 h-20 text-purple-600 mx-auto animate-bounce" />
+                            </div>
+                            <h2 className="text-4xl font-black text-purple-600 mb-2">GAME OVER</h2>
+                            <p className="text-lg font-bold text-slate-600 mb-8">
+                                {difficulty === 'oni' ? '鬼ハードモードの洗礼を受けました...' : '3回間違えてしまいました...'}
+                            </p>
+                            
+                            <div className="bg-slate-100 p-6 rounded-xl mb-8">
+                                <p className="text-sm text-slate-500 font-bold uppercase mb-1">今回の記録</p>
+                                <p className="text-2xl font-bold">
+                                    {currentIndex + 1}問目で脱落 <span className="text-base font-normal text-slate-500">（スコア: {score}）</span>
+                                </p>
+                                <p className="text-xs text-slate-400 mt-2">※ゲームオーバーのためランキングには登録されません</p>
+                            </div>
+
+                            <button 
+                                onClick={handleRestart}
+                                className="inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full transition-colors duration-200"
+                            >
+                                <RotateCcw className="w-5 h-5" />
+                                もう一度挑戦する
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (appState === 'result') {
+                return (
+                    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
+                        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 p-8 text-center">
+                            <Trophy className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+                            <h2 className="text-2xl font-bold mb-4">全問クリア！おめでとう！</h2>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="bg-slate-50 p-4 rounded-xl">
+                                    <div className="text-sm text-slate-500 font-bold mb-1">スコア</div>
+                                    <div className="text-3xl font-black text-indigo-600">
+                                        {score} <span className="text-sm text-slate-400">/ {questionCount}</span>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded-xl">
+                                    <div className="text-sm text-slate-500 font-bold mb-1">タイム</div>
+                                    <div className="text-3xl font-black text-indigo-600">
+                                        {formatTime(elapsedTime)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-8">
+                                <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center justify-center gap-2">
+                                    <Medal className="w-5 h-5 text-yellow-500" />
+                                    {questionCount}問コース ランキング
+                                </h3>
+                                <div className="bg-slate-50 rounded-xl overflow-hidden border border-slate-200">
+                                    {rankings.length > 0 ? (
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-100 text-slate-500">
+                                                <tr>
+                                                    <th className="p-3 text-center w-12">#</th>
+                                                    <th className="p-3">名前</th>
+                                                    <th className="p-3 text-right">スコア</th>
+                                                    <th className="p-3 text-right">タイム</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rankings.map((rank, i) => (
+                                                    <tr key={i} className={`border-t border-slate-200 ${rank.name === playerName && rank.time === elapsedTime ? 'bg-yellow-50 font-bold' : ''}`}>
+                                                        <td className="p-3 text-center font-bold text-slate-400">
+                                                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                                                        </td>
+                                                        <td className="p-3">{rank.name}</td>
+                                                        <td className="p-3 text-right">{rank.score}</td>
+                                                        <td className="p-3 text-right font-mono">{formatTime(rank.time)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    ) : (
+                                        <div className="p-4 text-slate-400 text-sm">まだ記録がありません</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={handleRestart}
+                                className="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-full transition-colors duration-200"
+                            >
+                                <RotateCcw className="w-5 h-5" />
+                                トップに戻る
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            const currentQ = questions[currentIndex];
+            const isGameOverPending = (difficulty === 'hard' && wrongCount >= 3) || (difficulty === 'oni' && wrongCount >= 1);
+
+            return (
+                <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-slate-800">
+                    <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200 relative">
+                        
+                        {/* ヘッダー */}
+                        <div className="bg-white border-b border-slate-100 p-4 md:p-6 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+                                    {currentIndex + 1} / {questionCount}
+                                </span>
+                                {getDifficultyBadge(difficulty)}
+                            </div>
+
+                            {difficulty === 'hard' && (
+                                <div className="flex items-center gap-1">
+                                    {[1, 2, 3].map(i => (
+                                        <Heart 
+                                            key={i} 
+                                            className={`w-5 h-5 ${i <= (3 - wrongCount) ? 'text-red-500 fill-red-500' : 'text-slate-200'}`} 
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            {difficulty === 'oni' && (
+                                <div className="flex items-center gap-1 text-purple-600 font-bold text-sm">
+                                    <Skull className="w-5 h-5" />
+                                    許容ミス: 0
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2 text-indigo-600 font-bold font-mono text-xl">
+                                <Clock className="w-5 h-5" />
+                                {formatTime(elapsedTime)}
+                            </div>
+                        </div>
+
+                        {/* 問題文エリア */}
+                        <div className="p-6 md:p-8">
+                            <div className="mb-6">
+                                <div className="flex gap-2 mb-2">
+                                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">{currentQ.category}</span>
+                                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded">{currentQ.grade}</span>
+                                </div>
+                                <h2 className="text-xl md:text-2xl font-bold leading-relaxed">
+                                    {currentQ.question}
+                                </h2>
+                            </div>
+
+                            {/* 選択肢 */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                {currentQ.options.map((option, index) => {
+                                    let buttonClass = "w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex justify-between items-center relative ";
+                                    
+                                    if (!showExplanation) {
+                                        buttonClass += "border-slate-200 hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer active:scale-[0.99]";
+                                    } else {
+                                        if (option === currentQ.answer) {
+                                            buttonClass += "border-green-500 bg-green-50 text-green-700 font-bold";
+                                        } else if (option === selectedOption) {
+                                            buttonClass += "border-red-500 bg-red-50 text-red-700";
+                                        } else {
+                                            buttonClass += "border-slate-100 text-slate-300 opacity-50";
+                                        }
+                                    }
+
+                                    return (
+                                        <button 
+                                            key={index} 
+                                            onClick={() => handleAnswerClick(option)}
+                                            disabled={showExplanation}
+                                            className={buttonClass}
+                                        >
+                                            <span className="text-lg">{option}</span>
+                                            {showExplanation && option === currentQ.answer && (
+                                                <CheckCircle className="w-6 h-6 text-green-500" />
+                                            )}
+                                            {showExplanation && option === selectedOption && option !== currentQ.answer && (
+                                                <XCircle className="w-6 h-6 text-red-500" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* 解説エリア */}
+                            {showExplanation && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                    <div className={`p-4 rounded-xl mb-6 border-l-4 shadow-sm ${isCorrect ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+                                        
+                                        <div className="flex justify-between items-start md:items-center mb-4 flex-col md:flex-row gap-4">
+                                            <div className="flex items-center gap-2">
+                                                {isCorrect ? (
+                                                    <span className="text-green-700 font-bold text-lg flex items-center gap-1">
+                                                        <CheckCircle className="w-5 h-5" /> 正解！
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-red-700 font-bold text-lg flex items-center gap-1">
+                                                        <XCircle className="w-5 h-5" /> 残念...
+                                                    </span>
+                                                )}
+                                            </div>
+                                            
+                                            <button 
+                                                onClick={handleNext}
+                                                className={`font-bold py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2 active:translate-y-0.5 text-sm ${
+                                                    isGameOverPending 
+                                                    ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' 
+                                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                                }`}
+                                            >
+                                                {isGameOverPending 
+                                                    ? 'ゲームオーバー...' 
+                                                    : currentIndex === questions.length - 1 ? '結果を見る' : '次の問題へ'
+                                                }
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <div className="text-slate-700 pt-2 border-t border-black/5">
+                                            <p className="font-bold text-sm text-slate-500 mb-1 flex items-center gap-1">
+                                                <BookOpen className="w-4 h-4" /> 解説
+                                            </p>
+                                            <p className="leading-relaxed">{currentQ.explanation}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ScienceQuizRankingApp />);
+    </script>
+</body>
+</html>
